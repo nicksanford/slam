@@ -20,6 +20,8 @@ using viam::service::slam::v1::GetPositionNewRequest;
 using viam::service::slam::v1::GetPositionNewResponse;
 using viam::service::slam::v1::GetPositionRequest;
 using viam::service::slam::v1::GetPositionResponse;
+using viam::service::slam::v1::GetInternalStateRequest;
+using viam::service::slam::v1::GetInternalStateResponse;
 using viam::service::slam::v1::SLAMService;
 
 namespace viam {
@@ -51,6 +53,10 @@ class SLAMServiceImpl final : public SLAMService::Service {
     ::grpc::Status GetPointCloudMap(
         ServerContext *context, const GetPointCloudMapRequest *request,
         GetPointCloudMapResponse *response) override;
+
+    ::grpc::Status SLAMServiceImpl::GetInternalState(ServerContext *context,
+                                       const GetInternalStateRequest *request,
+                                       GetInternalStateResponse *response) override;
 
     void ProcessDataOnline(ORB_SLAM3::System *SLAM);
 

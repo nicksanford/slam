@@ -425,6 +425,13 @@ std::atomic<bool> b_continue_session{true};
     return grpc::Status::OK;
 }
 
+::grpc::Status SLAMServiceImpl::GetInternalState(ServerContext *context,
+                                       const GetInternalStateRequest *request,
+                                       GetInternalStateResponse *response) {
+                                        
+    return grpc::Status::OK;
+}
+
 void SLAMServiceImpl::ProcessDataOnline(ORB_SLAM3::System *SLAM) {
     std::vector<std::string> filesRGB = utils::ListFilesInDirectoryForCamera(
         path_to_data + strRGB, ".png", camera_name);
