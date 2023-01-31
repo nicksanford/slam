@@ -428,8 +428,49 @@ std::atomic<bool> b_continue_session{true};
 ::grpc::Status SLAMServiceImpl::GetInternalState(ServerContext *context,
                                        const GetInternalStateRequest *request,
                                        GetInternalStateResponse *response) {
-                                        
-    return grpc::Status::OK;
+
+    std::stringbuf buffer;
+    bool success = ArchiveSlam(buffer);
+    if (success) {
+        response->set_internal_state(buffer.str());
+        return grpc::Status::OK;
+    } else {
+        return grpc::Status(grpc::StatusCode::UNAVAILABLE,
+                            "SLAM is not yet initialized");
+    }
+}
+
+// TODO: This setter existing is an antipattern,
+// which only exists b/c we only have one class
+// for both the data thread(s) & GRPC server & the
+// fact that it takes a while to fully initialize
+// the slam algo (longer than we want to wait to 
+// boot the GRPC server, so as to not hit timeouts
+// in RDK).
+// In the future there should be a class that initializes
+// the slam object when it is initialized
+// so that the slam pointer can never be null.
+// It only exists so that ArchiveSlam (called by the
+// GRPC handlers) can get access to the slam object
+// to call DumpOsa.
+void SLAMServiceImpl::SetSlam(ORB_SLAM3::System* s) {
+    slam = s;
+}
+
+bool SLAMServiceImpl::ArchiveSlam(std::stringbuf &buffer) {
+    // I belive this is the right place to put this mutex as
+    // if I put it as the first line within the if statement,
+    // there is no gurantee slam hasn't been set to nullptr
+    // by another thread immediately after the if statement
+    // predicate completes but before the mutex starts.
+    std::lock_guard<std::mutex> lk(slam_mutex);
+    if (slam == nullptr) {
+        BOOST_LOG_TRIVIAL(debug) << "ArchiveSlam slam is NULL";
+        return false;
+    }
+    BOOST_LOG_TRIVIAL(debug) << "ArchiveSlam slam is NOT NULL";
+    slam->DumpOsa(buffer);
+    return true;
 }
 
 void SLAMServiceImpl::ProcessDataOnline(ORB_SLAM3::System *SLAM) {

@@ -16,7 +16,6 @@
 using namespace boost::filesystem;
 using grpc::Server;
 using grpc::ServerBuilder;
-using SlamPtr = std::unique_ptr<ORB_SLAM3::System>;
 
 void exit_loop_handler(int s) {
     BOOST_LOG_TRIVIAL(info) << "Finishing session";
@@ -170,6 +169,7 @@ int main(int argc, char **argv) {
         SLAM->GetAtlas()->ChangeMap(largestMap);
     }
 
+    // slamService.SetSlam(SLAM.get());
     if (!slamService.use_live_data) {
         BOOST_LOG_TRIVIAL(info) << "Running in offline mode";
         slamService.StartSaveAtlasAsOsa(SLAM.get());
