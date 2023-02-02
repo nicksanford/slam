@@ -21,6 +21,7 @@ using viam::common::v1::PoseInFrame;
 
 #define IMAGE_SIZE 300
 #define MAX_COLOR_VALUE 255
+#define GRPC_STREAM_CHUNK_BYTE_SIZE 32768 // 256kb
 const std::string strRGB = "/rgb";
 const std::string strDepth = "/depth";
 namespace viam {
@@ -126,7 +127,7 @@ std::atomic<bool> b_continue_session{true};
 
 ::grpc::Status SLAMServiceImpl::GetPointCloudMap(
     ServerContext *context, const GetPointCloudMapRequest *request,
-    GetPointCloudMapResponse *response) {
+    ServerWriter<GetPointCloudMapResponse>* writer) {
     std::vector<ORB_SLAM3::MapPoint *> actualMap;
     {
         std::lock_guard<std::mutex> lk(slam_mutex);
@@ -138,15 +139,33 @@ std::atomic<bool> b_continue_session{true};
                             "currently no map points exist");
     }
 
-    auto buffer = utils::PcdHeader(actualMap.size());
+    std::vector<char> buffer(GRPC_STREAM_CHUNK_BYTE_SIZE);
+    auto header = utils::PcdHeader(actualMap.size());
+    std::copy(header.begin(), header.end(), std::back_inserter(buffer));
 
+    GetPointCloudMapResponse response;
     for (auto p : actualMap) {
         Eigen::Matrix<float, 3, 1> v = p->GetWorldPos();
-        utils::WriteFloatToBufferInBytes(buffer, v.x());
-        utils::WriteFloatToBufferInBytes(buffer, v.y());
-        utils::WriteFloatToBufferInBytes(buffer, v.z());
+        bool buffer_not_yet_full = buffer.size() + sizeof(float) * 3 <= GRPC_STREAM_CHUNK_BYTE_SIZE;
+        if (buffer_not_yet_full) {
+            // buffer is not full, write to the buffer
+            utils::WriteEigenToBufferInBytes(buffer, v);
+
+        } else {
+            // buffer is now full, flush the buffer, then write to the buffer
+            response.set_point_cloud_pcd(buffer);
+            writer->Write(response);
+            buffer.clear();
+
+            utils::WriteEigenToBufferInBytes(buffer, v);
+        }
     }
-    response->set_point_cloud_pcd(buffer);
+    if (buffer.size() != 0) {
+        response.set_point_cloud_pcd(buffer);
+        writer->Write(response);
+        buffer.clear();
+    }
+
     return grpc::Status::OK;
 }
 
@@ -427,12 +446,14 @@ std::atomic<bool> b_continue_session{true};
 
 ::grpc::Status SLAMServiceImpl::GetInternalState(ServerContext *context,
                                        const GetInternalStateRequest *request,
-                                       GetInternalStateResponse *response) {
+                                       ServerWriter<GetInternalStateResponse>* writer) {
 
     std::stringbuf buffer;
     bool success = ArchiveSlam(buffer);
     if (success) {
-        response->set_internal_state(buffer.str());
+        GetInternalStateResponse response;
+        response.set_internal_state(buffer.str());
+        writer->Write(response);
         return grpc::Status::OK;
     } else {
         return grpc::Status(grpc::StatusCode::UNAVAILABLE,
@@ -1087,6 +1108,19 @@ void WriteFloatToBufferInBytes(std::string &buffer, float f) {
     for (std::size_t i = 0; i < sizeof(float); ++i) {
         buffer.push_back(p[i]);
     }
+}
+
+void WriteFloatToBufferInBytes(std::vector<char> &buffer, float f) {
+    auto p = (const char *)(&f);
+    for (std::size_t i = 0; i < sizeof(float); ++i) {
+        buffer.push_back(p[i]);
+    }
+}
+
+void WriteEigenToBufferInBytes(std::vector<char> &buffer, Eigen::Matrix<float, 3, 1> v) {
+    WriteFloatToBufferInBytes(buffer, v.x());
+    WriteFloatToBufferInBytes(buffer, v.y());
+    WriteFloatToBufferInBytes(buffer, v.z());
 }
 
 }  // namespace utils

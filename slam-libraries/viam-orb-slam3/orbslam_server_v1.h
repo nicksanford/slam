@@ -12,6 +12,7 @@
 #include "service/slam/v1/slam.pb.h"
 
 using grpc::ServerContext;
+using grpc::ServerWriter;
 using viam::service::slam::v1::GetMapRequest;
 using viam::service::slam::v1::GetMapResponse;
 using viam::service::slam::v1::GetPointCloudMapRequest;
@@ -53,11 +54,11 @@ class SLAMServiceImpl final : public SLAMService::Service {
     */
     ::grpc::Status GetPointCloudMap(
         ServerContext *context, const GetPointCloudMapRequest *request,
-        GetPointCloudMapResponse *response) override;
+        ServerWriter<GetPointCloudMapResponse>* response) override;
 
    ::grpc::Status GetInternalState(ServerContext *context,
                                        const GetInternalStateRequest *request,
-                                       GetInternalStateResponse *response) override;
+                                       ServerWriter<GetInternalStateResponse>* response) override;
 
     void ProcessDataOnline(ORB_SLAM3::System *SLAM);
 
@@ -162,6 +163,8 @@ void RemoveFile(std::string file_path);
 std::string PcdHeader(int mapSize);
 
 void WriteFloatToBufferInBytes(std::string &buffer, float f);
+void WriteFloatToBufferInBytes(std::vector<char> &buffer, float f);
+void WriteEigenToBufferInBytes(std::vector<char> &buffer, Eigen::Matrix<float, 3, 1> v);
 
 }  // namespace utils
 }  // namespace viam

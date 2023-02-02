@@ -9,8 +9,9 @@ bufsetup:
 	pkg-config openssl || export PKG_CONFIG_PATH=$$PKG_CONFIG_PATH:`find \`which brew > /dev/null && brew --prefix\` -name openssl.pc | head -n1 | xargs dirname`
 
 buf: bufsetup
-	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./buf.gen.yaml buf.build/viamrobotics/api
-	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./buf.grpc.gen.yaml buf.build/viamrobotics/api
+	
+	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./buf.gen.yaml https://github.com/nicksanford/api.git
+	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./buf.grpc.gen.yaml https://github.com/nicksanford/api.git
 	PATH="${PATH}:`pwd`/grpc/bin" buf generate --template ./buf.gen.yaml buf.build/googleapis/googleapis
 
 clean-all: cleanorb cleancarto
